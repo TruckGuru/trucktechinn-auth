@@ -206,71 +206,45 @@
             showSection('success-state');
         }
         
-        // Update password using corrected Supabase API approach
-        async function updatePassword(newPassword, accessToken, refreshToken) {
+        // Update password using proper Supabase recovery flow
+        async function updatePassword(newPassword, accessToken) {
             try {
-                // Method 1: Try the session-based approach for recovery
-                const sessionResponse = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
-                    method: 'POST',
+                console.log('Attempting password update...');
+                console.log('Access token length:', accessToken ? accessToken.length : 0);
+                
+                const response = await fetch(SUPABASE_URL + '/auth/v1/user', {
+                    method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`,
                         'apikey': SUPABASE_ANON_KEY
                     },
                     body: JSON.stringify({
-                        refresh_token: refreshToken
+                        password: newPassword
                     })
                 });
                 
-                if (sessionResponse.ok) {
-                    const sessionData = await sessionResponse.json();
-                    
-                    // Now update password with the session
-                    const updateResponse = await fetch(SUPABASE_URL + '/auth/v1/user', {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + sessionData.access_token,
-                            'apikey': SUPABASE_ANON_KEY
-                        },
-                        body: JSON.stringify({
-                            password: newPassword
-                        })
-                    });
-                    
-                    if (updateResponse.ok) {
-                        return await updateResponse.json();
-                    }
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                if (!response.ok) {
+                    const errorData = await response.text();
+                    console.error('Error response:', errorData);
+                    throw new Error(`HTTP ${response.status}: ${errorData}`);
                 }
                 
-                // Method 2: Fallback - For recovery flows, password might already be updatable
-                // Just validate that the tokens are valid and show success
-                if (accessToken && refreshToken) {
-                    // Validate the session is active
-                    const userResponse = await fetch(SUPABASE_URL + '/auth/v1/user', {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': 'Bearer ' + accessToken,
-                            'apikey': SUPABASE_ANON_KEY
-                        }
-                    });
-                    
-                    if (userResponse.ok) {
-                        // Session is valid - for recovery flows, the password can be updated
-                        // through the recovery token mechanism, so we can show success
-                        return { success: true, message: 'Password updated successfully' };
-                    }
-                }
-                
-                throw new Error('Failed to establish authenticated session');
+                const result = await response.json();
+                console.log('Success response:', result);
+                return result;
                 
             } catch (error) {
-                console.error('Password update error:', error);
+                console.error('Password update failed:', error);
                 throw error;
             }
         }
         
         // Handle password reset form
-        function setupPasswordReset(accessToken, refreshToken) {
+        function setupPasswordReset(accessToken) {
             const form = document.getElementById('reset-form');
             const newPassword = document.getElementById('new-password');
             const confirmPassword = document.getElementById('confirm-password');
@@ -295,15 +269,10 @@
                 button.textContent = 'Updating...';
                 
                 try {
-                    await updatePassword(newPassword.value, accessToken, refreshToken);
+                    await updatePassword(newPassword.value, accessToken);
                     showSuccess('Your password has been updated successfully! You can now log into your account with your new password.');
                 } catch (error) {
-                    // For recovery flows, even if the API call fails, the password might still be updated
-                    // This is because Supabase handles recovery differently
-                    console.error('API Error:', error.message);
-                    
-                    // Show success anyway since recovery tokens enable password updates
-                    showSuccess('Your password has been updated successfully! You can now log into your account with your new password.');
+                    showError('Failed to update password: ' + error.message);
                 } finally {
                     button.disabled = false;
                     button.textContent = 'Update Password';
@@ -332,7 +301,7 @@
             // Check for successful password reset
             if (params.access_token && params.type === 'recovery') {
                 showSection('password-reset');
-                setupPasswordReset(params.access_token, params.refresh_token);
+                setupPasswordReset(params.access_token);
                 return;
             }
             
