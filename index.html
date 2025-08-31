@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Verification</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8fafc;
+            color: #334155;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 50vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #1e293b;
+        }
+        .success {
+            color: #059669;
+            background-color: #d1fae5;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .error {
+            color: #dc2626;
+            background-color: #fee2e2;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .loading {
+            color: #0ea5e9;
+            background-color: #e0f2fe;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+            min-width: 120px;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .app-links {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .hidden {
+            display: none;
+        }
+        .spinner {
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            TRUCK TECH INNOVATIONS LLC<br>
+            <span style="font-size: 18px; color: #64748b;">Trucker Brain</span>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loading-state" class="loading">
+            <div class="spinner"></div>
+            Processing your request...
+        </div>
+        
+        <!-- Email Confirmation Success -->
+        <div id="email-confirmed" class="hidden">
+            <div class="success">
+                <h2>Email Confirmed!</h2>
+                <p>Your email address has been successfully verified. You can now log into your account.</p>
+            </div>
+        </div>
+        
+        <!-- Password Reset Form -->
+        <div id="password-reset" class="hidden">
+            <h2>Reset Your Password</h2>
+            <p>Please enter your new password below:</p>
+            <form id="reset-form">
+                <input type="password" id="new-password" placeholder="New Password" required minlength="6">
+                <input type="password" id="confirm-password" placeholder="Confirm New Password" required minlength="6">
+                <button type="submit" id="reset-button">Update Password</button>
+            </form>
+        </div>
+        
+        <!-- Error State -->
+        <div id="error-state" class="hidden">
+            <div class="error">
+                <h2>Authentication Error</h2>
+                <p id="error-message">There was a problem processing your request. Please try again.</p>
+            </div>
+        </div>
+        
+        <!-- Success State -->
+        <div id="success-state" class="hidden">
+            <div class="success">
+                <h2>Success!</h2>
+                <p id="success-message">Your request has been completed successfully.</p>
+            </div>
+        </div>
+        
+        <!-- Return to App -->
+        <div class="app-links">
+            <p>Return to your mobile app to continue.</p>
+        </div>
+    </div>
+
+    <script>
+        // Supabase configuration - no external library needed
+        const SUPABASE_URL = 'https://jprgnupbwvfniplevihm.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwcmdudXBid3ZmbmlwbGV2aWhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1MDQwMzQsImV4cCI6MjA1ODA4MDAzNH0.hBnsvByCvRlL7MSo2j9XeFo0idpUilBYHo4eV_Z76iE';
+        
+        // Extract parameters from URL hash
+        function getHashParams() {
+            const hash = window.location.hash.substring(1);
+            const params = {};
+            
+            if (hash) {
+                hash.split('&').forEach(pair => {
+                    const [key, value] = pair.split('=');
+                    if (key && value) {
+                        params[decodeURIComponent(key)] = decodeURIComponent(value);
+                    }
+                });
+            }
+            
+            return params;
+        }
+        
+        // Show specific section
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('[id$="-state"], [id$="-confirmed"], [id$="-reset"]').forEach(el => {
+                el.classList.add('hidden');
+            });
+            
+            // Show target section
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.classList.remove('hidden');
+            }
+        }
+        
+        // Show error message
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            showSection('error-state');
+        }
+        
+        // Show success message
+        function showSuccess(message) {
+            document.getElementById('success-message').textContent = message;
+            showSection('success-state');
+        }
+        
+        // Update password using direct REST API call
+        async function updatePassword(newPassword, accessToken) {
+            try {
+                const response = await fetch(SUPABASE_URL + '/auth/v1/user', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + accessToken,
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({
+                        password: newPassword
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Password update failed');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                throw error;
+            }
+        }
+        
+        // Handle password reset form
+        function setupPasswordReset(accessToken) {
+            const form = document.getElementById('reset-form');
+            const newPassword = document.getElementById('new-password');
+            const confirmPassword = document.getElementById('confirm-password');
+            const button = document.getElementById('reset-button');
+            
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // Validation
+                if (newPassword.value !== confirmPassword.value) {
+                    showError('Passwords do not match. Please try again.');
+                    return;
+                }
+                
+                if (newPassword.value.length < 6) {
+                    showError('Password must be at least 6 characters long.');
+                    return;
+                }
+                
+                // Update UI
+                button.disabled = true;
+                button.textContent = 'Updating...';
+                
+                try {
+                    await updatePassword(newPassword.value, accessToken);
+                    showSuccess('Your password has been updated successfully! You can now log into your account with your new password.');
+                } catch (error) {
+                    showError('Failed to update password: ' + error.message);
+                } finally {
+                    button.disabled = false;
+                    button.textContent = 'Update Password';
+                }
+            });
+        }
+        
+        // Main handler
+        function handleAuth() {
+            const params = getHashParams();
+            
+            // Check for errors first
+            if (params.error) {
+                let errorMessage = 'Authentication failed. Please try again.';
+                
+                if (params.error_code === 'otp_expired') {
+                    errorMessage = 'This link has expired. Please request a new password reset email.';
+                } else if (params.error_description) {
+                    errorMessage = decodeURIComponent(params.error_description.replace(/\+/g, ' '));
+                }
+                
+                showError(errorMessage);
+                return;
+            }
+            
+            // Check for successful password reset
+            if (params.access_token && params.type === 'recovery') {
+                showSection('password-reset');
+                setupPasswordReset(params.access_token);
+                return;
+            }
+            
+            // Check for email confirmation
+            if (params.access_token && params.type === 'signup') {
+                showSection('email-confirmed');
+                return;
+            }
+            
+            // No valid parameters
+            showError('Invalid authentication link. Please check your email for the correct link or request a new one.');
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(handleAuth, 500);
+        });
+    </script>
+</body>
+</html>
