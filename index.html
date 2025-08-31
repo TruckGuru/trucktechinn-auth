@@ -62,6 +62,24 @@
             font-size: 16px;
             box-sizing: border-box;
         }
+        .password-container {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #6b7280;
+            font-size: 18px;
+            user-select: none;
+        }
+        .password-toggle:hover {
+            color: #374151;
+        }
         button {
             background-color: #3b82f6;
             color: white;
@@ -130,8 +148,14 @@
             <h2>Reset Your Password</h2>
             <p>Please enter your new password below:</p>
             <form id="reset-form">
-                <input type="password" id="new-password" placeholder="New Password" required minlength="6">
-                <input type="password" id="confirm-password" placeholder="Confirm New Password" required minlength="6">
+                <div class="password-container">
+                    <input type="password" id="new-password" placeholder="New Password" required minlength="6">
+                    <span class="password-toggle" data-target="new-password">👁️</span>
+                </div>
+                <div class="password-container">
+                    <input type="password" id="confirm-password" placeholder="Confirm New Password" required minlength="6">
+                    <span class="password-toggle" data-target="confirm-password">👁️</span>
+                </div>
                 <button type="submit" id="reset-button">Update Password</button>
             </form>
         </div>
@@ -317,6 +341,22 @@
         
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', () => {
+            // Setup password visibility toggles
+            document.querySelectorAll('.password-toggle').forEach(toggle => {
+                toggle.addEventListener('click', () => {
+                    const targetId = toggle.getAttribute('data-target');
+                    const passwordInput = document.getElementById(targetId);
+                    
+                    if (passwordInput.type === 'password') {
+                        passwordInput.type = 'text';
+                        toggle.textContent = '🙈';
+                    } else {
+                        passwordInput.type = 'password';
+                        toggle.textContent = '👁️';
+                    }
+                });
+            });
+            
             setTimeout(handleAuth, 500);
         });
     </script>
